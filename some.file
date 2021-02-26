@@ -1,0 +1,14 @@
+HTTP/1.1 200 OK
+Cache-Control: no-cache
+Expires: Thu, 25 Feb 2021 15:17:32 GMT
+Date: Thu, 25 Feb 2021 15:17:32 GMT
+Pragma: no-cache
+Expires: Thu, 25 Feb 2021 15:17:32 GMT
+Date: Thu, 25 Feb 2021 15:17:32 GMT
+Pragma: no-cache
+Content-Type: application/json
+X-FRAME-OPTIONS: SAMEORIGIN
+Set-Cookie: hadoop.auth="u=aivanov&p=aivanov&t=simple&e=1614302252172&s=05D6Zh7U7fVcF9RcTY+i6t5MxBPj2/H9lHFEodWYYsQ="; Path=/; HttpOnly
+Transfer-Encoding: chunked
+
+{"Location":"http://localhost:50075/webhdfs/v1/user/aivanov/wordcount/input/file01?op=OPEN&user.name=aivanov&namenoderpcaddress=localhost:9000&offset=0"}
