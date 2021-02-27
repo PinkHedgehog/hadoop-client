@@ -6,6 +6,7 @@ import Control.Monad.Trans.Reader
 import System.Environment
 import Control.Monad
 import System.Exit
+import System.IO
 import System.Directory
 import Control.Exception
 import qualified Data.Text as T
@@ -44,6 +45,6 @@ main = do
             putStr =<< readFile "Help.txt"
             putStrLn ""
             let initialContext = Client.Context url' port' username cur' loc'
-            putStr "> "
+            hFlush stdout
             runReaderT repl initialContext
 

@@ -12,7 +12,7 @@ import Control.Monad.Trans.Reader
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad
 import Network.Wreq
-import qualified Data.Text as T (Text, pack, splitOn, concat, unpack)
+import qualified Data.Text as T (Text, pack, splitOn, concat, unpack, intercalate)
 import qualified Data.Text.IO as T
 import Data.Text.Encoding (encodeUtf8, decodeUtf8)
 import Data.List (last, sort, init)
@@ -35,10 +35,7 @@ type Request = String
 type Filename = String
 
 data Operation = Operation Opcode Filename deriving (Show, Eq)
-data Opcode = MKDIR | CD | LS | DEL | AP Filename | LLS | LCD | PUT | GET deriving (Show, Eq)
-
-kekstr = "http://192.168.137.172:50070/webhdfs/v1/user/aivanov?user.name=aivanov&op=LISTSTATUS"
-initialContext = Context "192.168.137.172" "50070" "aivanov" "user/aivanov" "."
+data Opcode = MKDIR | CD | LS | DELETE | APPEND Filename | LLS | LCD | PUT | GET deriving (Show, Eq, Read)
 
 performOperation :: Operation -> ReaderT Context IO ()
 performOperation (Operation opcode filename) = do
@@ -51,12 +48,42 @@ performOperation (Operation opcode filename) = do
         opts = requestOpts opcode & param "user.name" .~ [T.pack $ user context]
 
     case opcode of
+        {-
+        CD -> do
+            let subPaths = T.splitOn "/"
+                update :: T.Text -> T.Text -> T.Text
+                update path filename 
+                    | length (subPaths path) == 2 && filename == ".." = path
+                    | length (subPaths path) > 2 && filename == ".." = T.intercalate "/" $ init $ subPaths path
+                    | otherwise = T.concat [path, "/", filename]
+                newDir = T.unpack $ update (T.pack cur') (T.pack filename)
+            availableDirs <- liftIO $ 
+                (map (T.unpack . snd) . filter (\(ftype, _) -> ftype == "DIRECTORY") . processLS) <$> 
+                    getWith (requestOpts LS) reqs
+            if filename `elem` availableDirs
+                then do
+                    liftIO $ putStrLn $ "New remote directory: " ++ newDir
+                    let context' = context {curDir = newDir}
+                    withReaderT (\x -> context') $ return ()
+                else liftIO $ putStrLn $ "No such directory: " ++ filename
+        -}
+        MKDIR -> do
+            liftIO $ do
+                r <- putWith opts (reqs ++ filename) ("" :: B.ByteString)
+                case r ^. responseBody ^? members . _Bool of
+                    Just x  -> putStrLn $ "Directory " ++ filename ++ " created: " ++ show x
+                    Nothing -> putStrLn $ "Something went wrong..."
+
         LS -> do
+            liftIO $ putStrLn $ "Hdfs directory: " ++ cur'
+            liftIO $ putStrLn $ "----------------" ++ replicate (length cur') '-'
             t <- liftIO $ getWith opts reqs
             liftIO $ mapM_ (\(ft, fn) -> T.putStr (expand ft) >> T.putStrLn fn ) $ processLS t
 
         GET -> do
-            availableFiles <- liftIO $ (map (T.unpack . snd) . processLS) <$> getWith (requestOpts LS) reqs
+            availableFiles <- liftIO $ 
+                (map (T.unpack . snd) . filter (\(ftype, _) -> ftype == "FILE") . processLS) <$> 
+                    getWith (requestOpts LS) reqs
             if filename `elem` availableFiles then do
                 let newOpts = opts & param "noredirect" .~ ["true"]
                 t <- liftIO $ getWith newOpts (reqs ++ filename)
@@ -90,6 +117,8 @@ performOperation (Operation opcode filename) = do
             exist <- doesDirectoryExist $ loc'
             if exist
                 then do
+                    putStrLn $ "Local directory: " ++ loc'
+                    putStrLn $ "-----------------" ++ replicate (length loc') '-'
                     fnames <- sort <$> listDirectory loc'
                     ftypes <- mapM doesFileExist fnames
                     zipWithM (\ftype fname -> if ftype 
@@ -98,14 +127,14 @@ performOperation (Operation opcode filename) = do
                     return ()
                 else putStrLn "No such directory..."
 
-        DEL -> do
+        DELETE -> do
             liftIO $ do
                 r <- deleteWith opts (reqs ++ filename)
                 case r ^. responseBody ^? members . _Bool of
                     Just x  -> putStrLn $ "File deleted: " ++ show x
                     Nothing -> putStrLn $ "Something went wrong..."
 
-        AP filenameLoc -> do
+        APPEND filenameLoc -> do
             let newOpts = opts & param "noredirect" .~ ["true"]
             file <- liftIO $ B.readFile filenameLoc
             let part = partLBS "file" file :: Part
@@ -150,13 +179,13 @@ requestString = do
 requestOpts :: Opcode -> Options
 requestOpts opcode = defaults & param "op" .~ [parse opcode]
     where
-        parse MKDIR  = "MKDIRS"
-        parse LS     = "LISTSTATUS"
-        parse PUT    = "CREATE"
-        parse GET    = "OPEN"
-        parse DEL    = "DELETE"
-        parse (AP _) = "APPEND"
-        parse _      = ""
+        parse MKDIR      = "MKDIRS"
+        parse LS         = "LISTSTATUS"
+        parse PUT        = "CREATE"
+        parse GET        = "OPEN"
+        parse DELETE     = "DELETE"
+        parse (APPEND _) = "APPEND"
+        parse _          = ""
 
 
 

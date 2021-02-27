@@ -7,12 +7,32 @@ import System.Directory
 import Data.List (init)
 import Data.Char (toUpper)
 import qualified Data.Text as T
+import System.IO (stdout, hFlush)
 
 repl :: ReaderT Context IO ()
 repl = do
-    liftIO $ putStr "> "
+    liftIO $ putStr "> " >> hFlush stdout
     command <- liftIO $ parse <$> getLine
     case command of
+    
+        Just (Operation CD filename) -> do
+            cur' <- asks curDir
+            context <- ask
+            let newDir = T.unpack $ update (T.pack cur') (T.pack filename)
+                reqs = runReader requestString context
+                opts = requestOpts CD & param "user.name" .~ [T.pack $ user context]
+            availableDirs <- liftIO $ 
+                (map (T.unpack . snd) . filter (\(ftype, _) -> ftype == "DIRECTORY") . processLS) <$> 
+                    getWith (requestOpts LS) reqs
+            if filename `elem` availableDirs
+                then do
+                    liftIO $ putStrLn $ "New remote directory: " ++ newDir
+                    let context' = context {curDir = newDir}
+                    withReaderT (const context') $ repl
+                else do
+                    liftIO $ putStrLn $ "No such directory: " ++ filename
+                    return ()
+
         Just (Operation LCD filename) -> do
             cur' <- asks locDir
             context <- ask
