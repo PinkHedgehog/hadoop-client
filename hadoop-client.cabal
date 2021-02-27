@@ -27,7 +27,7 @@ source-repository head
 
 library
   exposed-modules:
-      Client, Network.Wreq, Data.Aeson.Lens, Control.Lens
+      Client, Shell
   other-modules:
       Paths_hadoop_client
   hs-source-dirs:
