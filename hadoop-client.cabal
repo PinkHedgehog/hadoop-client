@@ -64,7 +64,7 @@ executable hadoop-client
     , containers
     , lens-aeson
     , bytestring
-    , array
+    , transformers
     , text
     , directory
   default-language: Haskell2010
