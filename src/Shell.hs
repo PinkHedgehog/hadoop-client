@@ -24,7 +24,7 @@ repl = do
             availableDirs <- liftIO $ 
                 (map (T.unpack . snd) . filter (\(ftype, _) -> ftype == "DIRECTORY") . processLS) <$> 
                     getWith (requestOpts LS) reqs
-            if filename `elem` availableDirs
+            if filename `elem` availableDirs || filename == ".."
                 then do
                     liftIO $ putStrLn $ "New remote directory: " ++ newDir
                     let context' = context {curDir = newDir}
