@@ -1,7 +1,7 @@
 # hadoop-client
 Simple hadoop client
 
-Suppors operations:
+Supports operations:
 
 (ACHTUNG! Russian!)
 
