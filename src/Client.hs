@@ -48,31 +48,12 @@ performOperation (Operation opcode filename) = do
         opts = requestOpts opcode & param "user.name" .~ [T.pack $ user context]
 
     case opcode of
-        {-
-        CD -> do
-            let subPaths = T.splitOn "/"
-                update :: T.Text -> T.Text -> T.Text
-                update path filename 
-                    | length (subPaths path) == 2 && filename == ".." = path
-                    | length (subPaths path) > 2 && filename == ".." = T.intercalate "/" $ init $ subPaths path
-                    | otherwise = T.concat [path, "/", filename]
-                newDir = T.unpack $ update (T.pack cur') (T.pack filename)
-            availableDirs <- liftIO $ 
-                (map (T.unpack . snd) . filter (\(ftype, _) -> ftype == "DIRECTORY") . processLS) <$> 
-                    getWith (requestOpts LS) reqs
-            if filename `elem` availableDirs
-                then do
-                    liftIO $ putStrLn $ "New remote directory: " ++ newDir
-                    let context' = context {curDir = newDir}
-                    withReaderT (\x -> context') $ return ()
-                else liftIO $ putStrLn $ "No such directory: " ++ filename
-        -}
         MKDIR -> do
             liftIO $ do
                 r <- putWith opts (reqs ++ filename) ("" :: B.ByteString)
                 case r ^. responseBody ^? members . _Bool of
                     Just x  -> putStrLn $ "Directory " ++ filename ++ " created: " ++ show x
-                    Nothing -> putStrLn $ "Something went wrong..."
+                    Nothing -> putStrLn "Something went wrong..."
 
         LS -> do
             liftIO $ putStrLn $ "Hdfs directory: " ++ cur'
@@ -82,7 +63,7 @@ performOperation (Operation opcode filename) = do
 
         GET -> do
             availableFiles <- liftIO $ 
-                (map (T.unpack . snd) . filter (\(ftype, _) -> ftype == "FILE") . processLS) <$> 
+                map (T.unpack . snd) . filter (\(ftype, _) -> ftype == "FILE") . processLS <$> 
                     getWith (requestOpts LS) reqs
             if filename `elem` availableFiles then do
                 let newOpts = opts & param "noredirect" .~ ["true"]
@@ -92,7 +73,7 @@ performOperation (Operation opcode filename) = do
                     finalAddr = T.concat [protocol, T.pack url', mid, "localhost", footer]
                 liftIO $ do
                     r <- get $ T.unpack finalAddr
-                    if (r ^. responseStatus . statusCode == 200)
+                    if r ^. responseStatus . statusCode == 200
                         then do
                             B.writeFile filename $ r ^. responseBody
                             putStrLn $ "File " ++ filename ++ " downloaded!"
@@ -121,10 +102,9 @@ performOperation (Operation opcode filename) = do
                     putStrLn $ "-----------------" ++ replicate (length loc') '-'
                     fnames <- sort <$> listDirectory loc'
                     ftypes <- mapM doesFileExist fnames
-                    zipWithM (\ftype fname -> if ftype 
+                    zipWithM_ (\ftype fname -> if ftype 
                         then putStr "FIL " >> putStrLn fname
                         else putStr "DIR " >> putStrLn fname) ftypes fnames
-                    return ()
                 else putStrLn "No such directory..."
 
         DELETE -> do
@@ -132,7 +112,7 @@ performOperation (Operation opcode filename) = do
                 r <- deleteWith opts (reqs ++ filename)
                 case r ^. responseBody ^? members . _Bool of
                     Just x  -> putStrLn $ "File deleted: " ++ show x
-                    Nothing -> putStrLn $ "Something went wrong..."
+                    Nothing -> putStrLn "Something went wrong..."
 
         APPEND filenameLoc -> do
             let newOpts = opts & param "noredirect" .~ ["true"]

@@ -1,9 +1,23 @@
 module Shell where
 
 import Client
-import Control.Monad.IO.Class
+    ( getWith,
+      param,
+      (&),
+      (.~),
+      Opcode(APPEND, CD, LCD, LS, LLS),
+      Operation(..),
+      Context(user, curDir, locDir),
+      performOperation,
+      processLS,
+      requestString,
+      requestOpts )
+import Control.Monad.IO.Class ( MonadIO(liftIO) )
+import Control.Monad ( when )
 import Control.Monad.Trans.Reader
+    ( ask, asks, runReader, withReaderT, ReaderT )
 import System.Directory
+    ( doesPathExist, getCurrentDirectory, setCurrentDirectory )
 import Data.List (init)
 import Data.Char (toUpper)
 import qualified Data.Text as T
@@ -22,13 +36,13 @@ repl = do
                 reqs = runReader requestString context
                 opts = requestOpts CD & param "user.name" .~ [T.pack $ user context]
             availableDirs <- liftIO $ 
-                (map (T.unpack . snd) . filter (\(ftype, _) -> ftype == "DIRECTORY") . processLS) <$> 
+                map (T.unpack . snd) . filter (\(ftype, _) -> ftype == "DIRECTORY") . processLS <$> 
                     getWith (requestOpts LS) reqs
             if filename `elem` availableDirs || filename == ".."
                 then do
                     liftIO $ putStrLn $ "New remote directory: " ++ newDir
                     let context' = context {curDir = newDir}
-                    withReaderT (const context') $ repl
+                    withReaderT (const context') repl
                 else do
                     liftIO $ putStrLn $ "No such directory: " ++ filename
                     return ()
@@ -37,14 +51,12 @@ repl = do
             cur' <- asks locDir
             context <- ask
             exist <- liftIO $ doesPathExist $ cur' ++ "/" ++ filename
-            if exist
-                then do
-                    liftIO $ setCurrentDirectory $ cur' ++ "/" ++ filename
-                    newDir <- liftIO getCurrentDirectory
-                    liftIO $ putStrLn $ "New local directory: " ++ newDir
-                    let context' = context {locDir = newDir}
-                    withReaderT (const context') repl
-                else return ()
+            when exist $ do
+                liftIO $ setCurrentDirectory $ cur' ++ "/" ++ filename
+                newDir <- liftIO getCurrentDirectory
+                liftIO $ putStrLn $ "New local directory: " ++ newDir
+                let context' = context {locDir = newDir}
+                withReaderT (const context') repl
         Just x -> performOperation x
         Nothing -> do
             liftIO $ putStrLn "Unknown operation"
@@ -52,7 +64,7 @@ repl = do
 
 update :: T.Text -> T.Text -> T.Text
 update path filename | length subPaths == 2 && filename == ".." = path
-                     | length subPaths > 2 && filename == ".." = T.intercalate "/" $ init $ subPaths
+                     | length subPaths > 2 && filename == ".." = T.intercalate "/" $ init subPaths
                      | otherwise = T.concat [path, "/", filename]
     where subPaths = T.splitOn "/" path
 
@@ -66,11 +78,11 @@ parse str = fromTokens tokens
         fromTokens ["lls"] = Just $ Operation LLS ""
         fromTokens [x] = Nothing
         fromTokens (opcode:filename:rest) 
-            | elem '/' filename = Nothing
+            | '/' `elem` filename = Nothing
             | opcode == "append" && 
-                (length rest < 1 || '/' `elem` head rest || length rest > 1) = Nothing
+                (null rest || '/' `elem` head rest || length rest > 1) = Nothing
             | opcode == "append" = Just $ Operation (APPEND filename) $ head rest
-            | length rest > 0 = Nothing
+            | not $ null rest = Nothing
             | opcode `elem` ["cd", "lcd", "put", "get", "delete", "mkdir"] = 
                 Just $ Operation (read . strToUpper $ opcode) filename
             | otherwise = Nothing

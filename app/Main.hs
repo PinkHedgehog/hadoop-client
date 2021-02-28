@@ -22,7 +22,7 @@ main = do
     let username = args !! 2
         cur' = "user/" ++ username
         port' = args !! 1
-        url' = args !! 0
+        url' = head args
 
     r <- try (get $ concat [ "http://"
                            , url'
