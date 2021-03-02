@@ -45,7 +45,7 @@ performOperation (Operation opcode filename) = do
     url' <- asks url
     loc' <- asks locDir
     let reqs = runReader requestString context
-        opts = requestOpts opcode & param "user.name" .~ [T.pack $ user context]
+        opts = requestOpts opcode & param "user.name" .~ [T.pack user']
 
     case opcode of
         MKDIR -> do
@@ -95,7 +95,7 @@ performOperation (Operation opcode filename) = do
                 putStrLn "File uploaded!"
 
         LLS -> liftIO $ do
-            exist <- doesDirectoryExist $ loc'
+            exist <- doesDirectoryExist loc'
             if exist
                 then do
                     putStrLn $ "Local directory: " ++ loc'
