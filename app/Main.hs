@@ -42,7 +42,7 @@ main = do
                 die "No home directory for current user"
         Right _ -> do
 
-            putStr =<< readFile "Help.txt"
+            putStr =<< readFile "Help_eng.txt"
             putStrLn ""
             let initialContext = Client.Context url' port' username cur' loc'
             hFlush stdout
