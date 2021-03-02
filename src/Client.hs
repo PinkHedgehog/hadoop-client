@@ -167,10 +167,3 @@ requestOpts opcode = defaults & param "op" .~ [parse opcode]
         parse (APPEND _) = "APPEND"
         parse _          = ""
 
-
-
-
-
-
-someFunc :: IO ()
-someFunc = putStrLn "someFunc"
